@@ -1,4 +1,12 @@
-# Web Stuff
+# Christmas GL
+
+Learning WebGL during Christmas 2022.
+
+
+## Resources
+
+* https://webgl2fundamentals.org/
+
 
 ## Typescript
 
