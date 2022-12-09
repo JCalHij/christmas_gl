@@ -1,6 +1,5 @@
 "use strict";
 
-//import wglh = require("./webgl-helper");
 import * as wglh from "./webgl-helper.js";
 import {Matrix4x4} from "./webgl-helper.js"
 
@@ -9,12 +8,16 @@ const vertexShaderSource = `#version 300 es
 // an attribute is an input (in) to a vertex shader.
 // It will receive data from a buffer
 in vec4 a_position;
+//in vec4 a_color;
+
+//out vec4 v_color;
 
 // A matrix to transform the positions by
 uniform mat4 u_matrix;
 
 // all shaders have a main function
 void main() {
+  //v_color = a_color;
   // Multiply the position by the matrix.
   gl_Position = u_matrix * a_position;
 }
@@ -24,13 +27,13 @@ const fragmentShaderSource = `#version 300 es
 
 precision highp float;
 
-uniform vec4 u_color;
+//in vec4 v_color;
 
 // we need to declare an output for the fragment shader
 out vec4 outColor;
 
 void main() {
-  outColor = u_color;
+  outColor = vec4(1, 0, 0, 1);
 }
 `;
 
@@ -58,12 +61,63 @@ void main() {
         return;
     }
 
+    const vao = gl.createVertexArray();
+    gl.bindVertexArray(vao);
+
+    const position_attr = gl.getAttribLocation(program, "a_position");
     const position_buffer = gl.createBuffer();
-    if (!position_buffer) {
-        alert("Could not generate a buffer for `position` attribute.");
-        return;
-    }
     gl.bindBuffer(gl.ARRAY_BUFFER, position_buffer);
+    set_cube_geometry(gl);
+    gl.enableVertexAttribArray(position_attr);
+    gl.vertexAttribPointer(position_attr, 3, gl.FLOAT, false, 0, 0);
+
+    /*const color_attr = gl.getAttribLocation(program, "a_color");
+    const color_buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, color_buffer);
+    set_cube_colors(gl);
+    gl.enableVertexAttribArray(color_attr);
+    gl.vertexAttribPointer(color_attr, 4, gl.UNSIGNED_BYTE, true, 0, 0);*/
+
+    gl.bindVertexArray(null);
+
+    // Uniforms
+    const matrix_uniform = gl.getUniformLocation(program, "u_matrix");
+
+    function render(time: number) {
+        const t_seconds = time * 0.001;
+        requestAnimationFrame(render);
+
+        const c = gl.canvas as HTMLCanvasElement;
+
+        wglh.resizeCanvasToDisplaySize(c as HTMLCanvasElement, 1);
+        gl.viewport(0, 0, c.width, c.height);
+
+        gl.clearColor(0, 0, 0, 255);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        gl.useProgram(program);
+
+        gl.bindVertexArray(vao);
+
+        const matrix = Matrix4x4.projection(c.clientWidth, c.clientHeight, 400);
+        matrix.translate(100, 100, 0);
+        const x_angle = t_seconds * 45;
+        const y_angle = t_seconds * 45;
+        const z_angle = t_seconds * 45;
+        matrix.rotate_x(x_angle*Math.PI/180);
+        matrix.rotate_y(y_angle*Math.PI/180);
+        matrix.rotate_z(z_angle*Math.PI/180);
+        matrix.scale(100, 100, 100);
+        gl.uniformMatrix4fv(matrix_uniform, false, matrix.buffer);
+
+        gl.drawArrays(gl.TRIANGLES, 0, 36);
+    }
+
+    requestAnimationFrame(render);
+})();
+
+
+function create_letter_f(gl: WebGL2RenderingContext) {
     const positions = [
         // left column
           0,   0,  0,
@@ -90,52 +144,84 @@ void main() {
          67,  90,  0
     ];
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+}
 
-    const vao = gl.createVertexArray();
-    if (!vao) {
-        alert("Could not generate a VAO.");
-        return;
-    }
-    gl.bindVertexArray(vao);
-    // Position attributes
-    const position_attr = gl.getAttribLocation(program, "a_position");
-    gl.enableVertexAttribArray(position_attr);
-    gl.vertexAttribPointer(position_attr, 3, gl.FLOAT, false, 0, 0);
-    // Uniforms
-    const color_uniform = gl.getUniformLocation(program, "u_color");
-    const matrix_uniform = gl.getUniformLocation(program, "u_matrix");
 
-    function render(time: number) {
-        const t_seconds = time * 0.001;
-        requestAnimationFrame(render);
+function set_cube_geometry(gl: WebGL2RenderingContext) {
+    const A = [+0.5, -0.5, +0.5];
+    const B = [-0.5, -0.5, +0.5];
+    const C = [-0.5, +0.5, +0.5];
+    const D = [+0.5, +0.5, +0.5];
+    const E = [+0.5, -0.5, -0.5];
+    const F = [-0.5, -0.5, -0.5];
+    const G = [-0.5, +0.5, -0.5];
+    const H = [+0.5, +0.5, -0.5];
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        // Top
+        ...A, ...C, ...B,
+        ...A, ...D, ...C,
+        // Front
+        ...A, ...F, ...D,
+        ...D, ...F, ...H,
+        // Back
+        ...B, ...C, ...F,
+        ...F, ...C, ...G,
+        // Left side
+        ...C, ...D, ...G,
+        ...D, ...H, ...G,
+        // Right side
+        ...A, ...F, ...B,
+        ...A, ...E, ...F,
+        // Bottom
+        ...E, ...G, ...F,
+        ...E, ...H, ...G,
+    ]), gl.STATIC_DRAW);
+}
 
-        const c = gl.canvas as HTMLCanvasElement;
 
-        wglh.resizeCanvasToDisplaySize(c as HTMLCanvasElement, 1);
-        gl.viewport(0, 0, c.width, c.height);
-
-        gl.clearColor(0, 0, 0, 0);
-        gl.clear(gl.COLOR_BUFFER_BIT);
-
-        gl.useProgram(program);
-
-        gl.bindVertexArray(vao);
-
-        const matrix = Matrix4x4.projection(c.clientWidth, c.clientHeight, 400);
-        matrix.translate(100, 100, 0);
-        const x_angle = t_seconds * 0;
-        const y_angle = t_seconds * 0;
-        const z_angle = t_seconds * 90;
-        matrix.rotate_x(x_angle*Math.PI/180);
-        matrix.rotate_y(y_angle*Math.PI/180);
-        matrix.rotate_z(z_angle*Math.PI/180);
-        matrix.scale(1, 1, 1);
-        gl.uniformMatrix4fv(matrix_uniform, false, matrix.buffer);
-
-        gl.uniform4fv(color_uniform, [0, 255, 255, 255]);
-
-        gl.drawArrays(gl.TRIANGLES, 0, 18);
-    }
-
-    requestAnimationFrame(render);
-})();
+function set_cube_colors(gl: WebGL2RenderingContext) {
+    gl.bufferData(gl.ARRAY_BUFFER, new Uint8Array([
+        // Top
+        255, 0, 0, 255,
+        255, 0, 0, 255,
+        255, 0, 0, 255,
+        255, 0, 0, 255,
+        255, 0, 0, 255,
+        255, 0, 0, 255,
+        // Front
+        0, 0, 0, 255,
+        0, 0, 0, 255,
+        0, 0, 0, 255,
+        0, 0, 0, 255,
+        0, 0, 0, 255,
+        0, 0, 0, 255,
+        // Back
+        0, 255, 0, 255,
+        0, 255, 0, 255,
+        0, 255, 0, 255,
+        0, 255, 0, 255,
+        0, 255, 0, 255,
+        0, 255, 0, 255,
+        // Left side
+        0, 0, 255, 255,
+        0, 0, 255, 255,
+        0, 0, 255, 255,
+        0, 0, 255, 255,
+        0, 0, 255, 255,
+        0, 0, 255, 255,
+        // Right side
+        255, 255, 0, 255,
+        255, 255, 0, 255,
+        255, 255, 0, 255,
+        255, 255, 0, 255,
+        255, 255, 0, 255,
+        255, 255, 0, 255,
+        // Bottom
+        255, 0, 255, 255,
+        255, 0, 255, 255,
+        255, 0, 255, 255,
+        255, 0, 255, 255,
+        255, 0, 255, 255,
+        255, 0, 255, 255,
+    ]), gl.STATIC_DRAW);
+}
